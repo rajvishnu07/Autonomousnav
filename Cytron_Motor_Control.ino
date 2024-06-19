@@ -1,7 +1,12 @@
+/* Motor Control using Teleop twist keyboard for Cytron Drivers
+Author: Vishnuraj A and Muhammed Zain
+Date : 03/06/2024
+Last update : 08/06/2024 */
+
 #include <ros.h>
 #include <std_msgs/Int16.h>
 #include <geometry_msgs/Twist.h>
- #include "CytronMotorDriver.h"
+#include "CytronMotorDriver.h"
  
 // Handles startup and shutdown of ROS
 ros::NodeHandle nh;
