@@ -14,12 +14,11 @@ ros::NodeHandle nh;
 ////////////////// Tick Data Publishing Variables and Constants ///////////////
  
 // Encoder output to Arduino Interrupt pin. Tracks the tick count.
+
+
 #define ENC_IN_LEFT_A 2
-#define ENC_IN_RIGHT_A 6
- 
-// Other encoder output to Arduino to keep track of wheel direction
-// Tracks the direction of rotation.
-#define ENC_IN_LEFT_B 7
+#define ENC_IN_RIGHT_A 3
+#define ENC_IN_LEFT_B 4
 #define ENC_IN_RIGHT_B 11
  
 // True = Forward; False = Reverse
@@ -46,18 +45,18 @@ long currentMillis = 0;
 ////////////////// Motor Controller Variables and Constants ///////////////////
  
 // Motor A connections Left Motor
-const int pwm1 = 3;
-const int dir1 = 4;
-CytronMD motor1(PWM_DIR, 3, 4);  // PWM 1 = Pin 3, DIR 1 = Pin 4
+const int pwm1 = 5;
+const int dir1 = 6;
+CytronMD motor1(PWM_DIR, 5, 6);  // PWM 1 = Pin 3, DIR 1 = Pin 4
 
 //const int enA = 9;
 //const int in1 = 5;
 //const int in2 = 6;
  
 // Motor B connections Right Motor
-const int pwm2 = 9;
-const int dir2 = 10;
-CytronMD motor2(PWM_DIR, 9, 10);
+const int pwm2 = 7;
+const int dir2 = 8;
+CytronMD motor2(PWM_DIR, 7, 8);
 
 //const int enB = 10;
 //const int in3 = 7;
@@ -70,14 +69,14 @@ const int PWM_INCREMENT = 1;
 const int TICKS_PER_REVOLUTION = 620;
  
 // Wheel radius in meters
-const double WHEEL_RADIUS = 0.1;
+const double WHEEL_RADIUS = 0.035;
  
 // Distance from center of the left tire to the center of the right tire in m
-const double WHEEL_BASE = 0.41;
+const double WHEEL_BASE = 0.27;
  
 // Number of ticks a wheel makes moving a linear distance of 1 meter
 // This value was measured manually.
-const double TICKS_PER_METER = 3100; // Originally 2880
+const double TICKS_PER_METER = 2267; // Originally 2880
  
 // Proportional constant, which was measured by measuring the
 // PWM-Linear Velocity relationship for the robot.
@@ -90,12 +89,12 @@ const int b = 52;
 const int DRIFT_MULTIPLIER = 120;
  
 // Turning PWM output (0 = min, 255 = max for PWM values)
-const int PWM_TURN = 190;
+const int PWM_TURN = 140;
  
 // Set maximum and minimum limits for the PWM values
-const int PWM_MIN = 230; // about 0.1 m/s
-const int PWM_MAX = 245; // about 0.172 m/s
-const int PWM_BACKWARD = 190;
+const int PWM_MIN = 140; // about 0.1 m/s
+const int PWM_MAX = 220; // about 0.172 m/s
+const int PWM_BACKWARD = 140;
  
 // Set linear velocity and PWM variable values for each wheel
 double velLeftWheel = 0;
