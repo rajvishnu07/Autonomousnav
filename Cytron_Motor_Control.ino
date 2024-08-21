@@ -3,6 +3,7 @@ Author: Vishnuraj A and Muhammed Zain
 Date : 03/06/2024
 Last update : 08/06/2024 */
 
+
 #include <ros.h>
 #include <std_msgs/Int16.h>
 #include <geometry_msgs/Twist.h>
@@ -28,8 +29,8 @@ boolean Direction_right = true;
  
 // Minumum and maximum values for 16-bit integers
 // Range of 65,535
-const int encoder_minimum = -32768;
-const int encoder_maximum = 32767;
+const int encoder_minimum = -65535;
+const int encoder_maximum = 65535;
  
 // Keep track of the number of wheel ticks
 std_msgs::Int16 right_wheel_tick_count;
@@ -93,7 +94,7 @@ const int DRIFT_MULTIPLIER = 120;
 const int PWM_TURN = 250;
  
 // Set maximum and minimum limits for the PWM values
-const int PWM_MIN = 190; // about 0.1 m/s
+const int PWM_MIN = 120; // about 0.1 m/s
 const int PWM_MAX = 255; // about 0.172 m/s
 
 // Set linear velocity and PWM variable values for each wheel
@@ -228,63 +229,81 @@ void calc_vel_right_wheel(){
 }
  
 // Take the velocity command as input and calculate the PWM values.
-void calc_pwm_values(const geometry_msgs::Twist& cmdVel) {
-   
+   void calc_pwm_values(const geometry_msgs::Twist &cmdVel) {
+
   // Record timestamp of last velocity command received
-  lastCmdVelReceived = (millis()/1000);
-   
-  // Calculate the PWM value given the desired velocity
-  pwmLeftReq = K_P * cmdVel.linear.x + b;
-  pwmRightReq = K_P * cmdVel.linear.x + b;
- 
+  lastCmdVelReceived = (millis() / 1000);
+
+  // Calculate the base PWM value based on linear velocity
+  double basePWM = K_P * fabs(cmdVel.linear.x) + b;
+
+  // Determine the direction and magnitude of PWM
+  if (cmdVel.linear.x >= 0) { // Moving forward
+    pwmLeftReq = -basePWM;
+    pwmRightReq = -basePWM;
+  } else { // Moving backward
+    pwmLeftReq = basePWM;
+    pwmRightReq = basePWM;
+  }
+
   // Check if we need to turn
   if (cmdVel.angular.z != 0.0) {
- 
-    // Turn left
-    if (cmdVel.angular.z > 0.0) {
-      pwmLeftReq = PWM_TURN;
-      pwmRightReq = -PWM_TURN;
+    if (cmdVel.linear.x >= 0) { // Forward motion
+      // Turn left
+      if (cmdVel.angular.z > 0.0) {
+        pwmLeftReq = PWM_TURN;
+        pwmRightReq = -PWM_TURN;
+      }
+      // Turn right
+      else {
+        pwmLeftReq = -PWM_TURN;
+        pwmRightReq = PWM_TURN;
+      }
+    } else { // Backward motion
+      // Turn left (while moving backward)
+      if (cmdVel.angular.z > 0.0) {
+        pwmLeftReq = PWM_TURN;
+        pwmRightReq = -PWM_TURN;
+      }
+      // Turn right (while moving backward)
+      else {
+        pwmLeftReq = -PWM_TURN;
+        pwmRightReq = PWM_TURN;
+      }
     }
-    // Turn right    
-    else {
-      pwmLeftReq = -PWM_TURN;
-      pwmRightReq = PWM_TURN;
-    }
   }
 
-  // Handle backward movement (originally forward)
-  if (cmdVel.linear.x > 0.0) {
-    static double prevDiff = 0;
-    static double prevPrevDiff = 0;
-    double currDifference = velLeftWheel - velRightWheel;
-    double avgDifference = (prevDiff + prevPrevDiff + currDifference) / 3;
-    prevPrevDiff = prevDiff;
-    prevDiff = currDifference;
+  // Handle drift correction for both forward and backward
+  static double prevDiff = 0;
+  static double prevPrevDiff = 0;
+  double currDifference = velLeftWheel - velRightWheel;
+  double avgDifference = (prevDiff + prevPrevDiff + currDifference) / 3;
+  prevPrevDiff = prevDiff;
+  prevDiff = currDifference;
 
-    pwmLeftReq = -(pwmLeftReq + (int)(avgDifference * DRIFT_MULTIPLIER));
-    pwmRightReq = -(pwmRightReq - (int)(avgDifference * DRIFT_MULTIPLIER));
-  }
-  // Handle forward movement (originally backward)
-  else if (cmdVel.linear.x < 0.0) {
-    static double prevDiff = 0;
-    static double prevPrevDiff = 0;
-    double currDifference = velLeftWheel - velRightWheel;
-    double avgDifference = (prevDiff + prevPrevDiff + currDifference) / 3;
-    prevPrevDiff = prevDiff;
-    prevDiff = currDifference;
-
-    pwmLeftReq = -(pwmLeftReq -(int)(avgDifference * DRIFT_MULTIPLIER));
-    pwmRightReq = -(pwmRightReq + (int)(avgDifference * DRIFT_MULTIPLIER));
+  if (cmdVel.linear.x >= 0) { // Moving forward
+    pwmLeftReq += (int)(avgDifference * DRIFT_MULTIPLIER);
+    pwmRightReq -= (int)(avgDifference * DRIFT_MULTIPLIER);
+  } else { // Moving backward
+    pwmLeftReq -= (int)(avgDifference * DRIFT_MULTIPLIER);
+    pwmRightReq += (int)(avgDifference * DRIFT_MULTIPLIER);
   }
 
-  // Handle low PWM values for both forward and backward motion
+  // Handle low PWM values
   if (abs(pwmLeftReq) < PWM_MIN) {
     pwmLeftReq = 0;
   }
   if (abs(pwmRightReq) < PWM_MIN) {
     pwmRightReq = 0;
-  }  
+  }
+
+  // Cap PWM values at maximum limits
+  pwmLeftReq = (pwmLeftReq > PWM_MAX) ? PWM_MAX : pwmLeftReq;
+  pwmRightReq = (pwmRightReq > PWM_MAX) ? PWM_MAX : pwmRightReq;
+  pwmLeftReq = (pwmLeftReq < -PWM_MAX) ? -PWM_MAX : pwmLeftReq;
+  pwmRightReq = (pwmRightReq < -PWM_MAX) ? -PWM_MAX : pwmRightReq;
 }
+
 
 void set_pwm_values() {
  
