@@ -12,6 +12,7 @@ Last update : 08/06/2024 */
 ros::NodeHandle nh;
  
 ////////////////// Tick Data Publishing Variables and Constants ///////////////
+
  
 // Encoder output to Arduino Interrupt pin. Tracks the tick count.
 
@@ -69,10 +70,10 @@ const int PWM_INCREMENT = 1;
 const int TICKS_PER_REVOLUTION = 620;
  
 // Wheel radius in meters
-const double WHEEL_RADIUS = 0.035;
+const double WHEEL_RADIUS = 0.216;
  
 // Distance from center of the left tire to the center of the right tire in m
-const double WHEEL_BASE = 0.27;
+const double WHEEL_BASE = 0.32;
  
 // Number of ticks a wheel makes moving a linear distance of 1 meter
 // This value was measured manually.
@@ -89,13 +90,12 @@ const int b = 52;
 const int DRIFT_MULTIPLIER = 120;
  
 // Turning PWM output (0 = min, 255 = max for PWM values)
-const int PWM_TURN = 140;
+const int PWM_TURN = 250;
  
 // Set maximum and minimum limits for the PWM values
-const int PWM_MIN = 140; // about 0.1 m/s
-const int PWM_MAX = 220; // about 0.172 m/s
-const int PWM_BACKWARD = 140;
- 
+const int PWM_MIN = 190; // about 0.1 m/s
+const int PWM_MAX = 255; // about 0.172 m/s
+
 // Set linear velocity and PWM variable values for each wheel
 double velLeftWheel = 0;
 double velRightWheel = 0;
@@ -242,47 +242,50 @@ void calc_pwm_values(const geometry_msgs::Twist& cmdVel) {
  
     // Turn left
     if (cmdVel.angular.z > 0.0) {
-      pwmLeftReq = -PWM_TURN;
-      pwmRightReq = PWM_TURN;
-    }
-    // Turn right    
-    else {
       pwmLeftReq = PWM_TURN;
       pwmRightReq = -PWM_TURN;
     }
+    // Turn right    
+    else {
+      pwmLeftReq = -PWM_TURN;
+      pwmRightReq = PWM_TURN;
+    }
   }
 
-  if (cmdVel.linear.x != 0.0){
-   if(cmdVel.linear.x < 0.0)
-  {pwmLeftReq = -PWM_BACKWARD;
-      pwmRightReq = -PWM_BACKWARD;
-      }
-  // Go straight
-  else {
-     
-    // Remove any differences in wheel velocities
-    // to make sure the robot goes straight
+  // Handle backward movement (originally forward)
+  if (cmdVel.linear.x > 0.0) {
     static double prevDiff = 0;
     static double prevPrevDiff = 0;
     double currDifference = velLeftWheel - velRightWheel;
-    double avgDifference = (prevDiff+prevPrevDiff+currDifference)/3;
+    double avgDifference = (prevDiff + prevPrevDiff + currDifference) / 3;
     prevPrevDiff = prevDiff;
     prevDiff = currDifference;
- 
-    // Correct PWM values of both wheels to make the vehicle go straight
-    pwmLeftReq -= (int)(avgDifference * DRIFT_MULTIPLIER);
-    pwmRightReq += (int)(avgDifference * DRIFT_MULTIPLIER);
+
+    pwmLeftReq = -(pwmLeftReq + (int)(avgDifference * DRIFT_MULTIPLIER));
+    pwmRightReq = -(pwmRightReq - (int)(avgDifference * DRIFT_MULTIPLIER));
   }
+  // Handle forward movement (originally backward)
+  else if (cmdVel.linear.x < 0.0) {
+    static double prevDiff = 0;
+    static double prevPrevDiff = 0;
+    double currDifference = velLeftWheel - velRightWheel;
+    double avgDifference = (prevDiff + prevPrevDiff + currDifference) / 3;
+    prevPrevDiff = prevDiff;
+    prevDiff = currDifference;
+
+    pwmLeftReq = -(pwmLeftReq -(int)(avgDifference * DRIFT_MULTIPLIER));
+    pwmRightReq = -(pwmRightReq + (int)(avgDifference * DRIFT_MULTIPLIER));
   }
-  // Handle low PWM values
+
+  // Handle low PWM values for both forward and backward motion
   if (abs(pwmLeftReq) < PWM_MIN) {
     pwmLeftReq = 0;
   }
   if (abs(pwmRightReq) < PWM_MIN) {
-    pwmRightReq = 0;  
+    pwmRightReq = 0;
   }  
 }
- 
+
 void set_pwm_values() {
  
   // These variables will hold our desired PWM values
